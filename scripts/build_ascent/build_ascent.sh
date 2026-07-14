@@ -52,6 +52,7 @@ build_umpire="${build_umpire:=true}"
 build_mfem="${build_mfem:=true}"
 build_catalyst="${build_catalyst:=false}"
 build_zfp="${build_zfp:=true}"
+build_anari="${build_anari:=false}"
 
 # ascent options
 build_ascent="${build_ascent:=true}"
@@ -721,6 +722,19 @@ fi
 if [[ "$enable_mpicc" == "ON" ]]; then
   viskores_extra_cmake_args="${viskores_extra_cmake_args} -DMPI_C_COMPILER=${mpicc_exe}"
   viskores_extra_cmake_args="${viskores_extra_cmake_args} -DMPI_CXX_COMPILER=${mpicxx_exe}"
+fi
+
+if ${build_anari}; then
+  # ANARI_DIR may be supplied externally (points at an installed ANARI-SDK).
+  # Otherwise falls back to the ANARI-SDK this script builds a few blocks below.
+  viskores_anari_dir="${ANARI_DIR:-${anari_install_dir:-}}"
+  if [[ -z "${viskores_anari_dir}" ]]; then
+    echo "**** ERROR: build_anari=true but neither ANARI_DIR nor anari_install_dir is set" >&2
+    exit 1
+  fi
+  viskores_extra_cmake_args="${viskores_extra_cmake_args} -DViskores_ENABLE_ANARI=ON"
+  viskores_extra_cmake_args="${viskores_extra_cmake_args} -Danari_DIR=${viskores_anari_dir}/lib/cmake/anari-0.15.0"
+  viskores_extra_cmake_args="${viskores_extra_cmake_args} -DCMAKE_PREFIX_PATH=${viskores_anari_dir}"
 fi
 
 echo "**** Configuring Viskores v${viskores_version}"
