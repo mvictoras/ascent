@@ -47,11 +47,20 @@ namespace filters
 struct AnariImpl;
 
 //-----------------------------------------------------------------------------
-class ASCENT_API AnariTriangles : public ::flow::Filter
+/// YAML type: 'anari'. Renders surface geometry through ANARI.
+/// Auto-detects mapper from the field's component count:
+///   scalar field (1 component) -> triangles mapper (colored surface)
+///   vector field (3 components) -> glyphs mapper (per-cell arrows/spheres)
+///
+/// The volumetric renderer is a separate filter (AnariVolume, type 'anari_volume')
+/// because it takes a semantically different input (volumetric field over a 3D
+/// domain) and has different sensible defaults (transfer function required,
+/// higher default sample count, etc.).
+class ASCENT_API AnariSurface : public ::flow::Filter
 {
 public:
-    AnariTriangles();
-    virtual ~AnariTriangles();
+    AnariSurface();
+    virtual ~AnariSurface();
 
     virtual void   declare_interface(conduit::Node &i);
     virtual bool   verify_params(const conduit::Node &params,
@@ -63,22 +72,8 @@ private:
 };
 
 //-----------------------------------------------------------------------------
-class ASCENT_API AnariGlyphs : public ::flow::Filter
-{
-public:
-    AnariGlyphs();
-    virtual ~AnariGlyphs();
-
-    virtual void   declare_interface(conduit::Node &i);
-    virtual bool   verify_params(const conduit::Node &params,
-                                 conduit::Node &info);
-    virtual void   execute();
-
-private:
-    std::shared_ptr<AnariImpl> pimpl;
-};
-
-//-----------------------------------------------------------------------------
+/// YAML type: 'anari_volume'. Renders volumetric fields through ANARI.
+/// Requires a scalar (1-component) field defined over a 3D domain.
 class ASCENT_API AnariVolume : public ::flow::Filter
 {
 public:

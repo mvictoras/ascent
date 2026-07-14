@@ -179,9 +179,8 @@ register_builtin()
 #endif
 
 #if defined(ASCENT_ANARI_ENABLED)
-    AscentRuntime::register_filter_type<AnariTriangles>("extracts", "anari_pseudocolor");
-    AscentRuntime::register_filter_type<AnariGlyphs>   ("extracts", "anari_glyphs");
-    AscentRuntime::register_filter_type<AnariVolume>   ("extracts", "anari_volume");
+    AscentRuntime::register_filter_type<AnariSurface>("extracts", "anari");
+    AscentRuntime::register_filter_type<AnariVolume> ("extracts", "anari_volume");
 #endif
 
 #if defined(ASCENT_MPI_ENABLED)

@@ -325,12 +325,12 @@ if(GENTEN_FOUND)
 endif()
 
 if(ANARI_FOUND)
-    # ANARI flow filters: shared AnariImpl in _common, one filter per remaining file.
+    # ANARI flow filters. Two YAML types: 'anari' (surface, dispatches
+    # triangles vs glyphs on field arity) and 'anari_volume' (volumetric).
     list(APPEND ascent_headers runtimes/flow_filters/ascent_runtime_anari_filters.hpp)
     list(APPEND ascent_headers runtimes/flow_filters/ascent_runtime_anari_common.hpp)
     list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_common.cpp)
-    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_triangles.cpp)
-    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_glyphs.cpp)
+    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_surface.cpp)
     list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_volume.cpp)
 endif()
 
