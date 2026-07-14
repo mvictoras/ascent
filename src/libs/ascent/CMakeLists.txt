@@ -52,6 +52,7 @@ set(ASCENT_GENTEN_ENABLED ${GENTEN_FOUND})
 set(ASCENT_KOKKOS_ENABLED ${KOKKOS_FOUND})
 set(ASCENT_BABELFLOW_ENABLED ${BABELFLOW_FOUND})
 set(ASCENT_ANARI_ENABLED  ${ANARI_FOUND})
+set(ASCENT_AIRENDER_ENABLED ${AIRENDER_FOUND})
 
 if(OCCA_FOUND AND UMPIRE_FOUND)
     set(ASCENT_JIT_ENABLED TRUE)
@@ -103,6 +104,7 @@ mark_as_advanced(ASCENT_INSTALL_PREFIX
                  ASCENT_VISKORES_CUDA_ENABLED
                  ASCENT_VISKORES_KOKKOS_ENABLED
                  ASCENT_ANARI_ENABLED
+                 ASCENT_AIRENDER_ENABLED
                  )
 
 # gen config header
@@ -444,6 +446,10 @@ endif()
 
 if(ANARI_FOUND)
     list(APPEND ascent_thirdparty_libs viskores::anari anari::anari)
+endif()
+
+if(AIRENDER_FOUND)
+    list(APPEND ascent_thirdparty_libs airender::airender)
 endif()
 
 ##########################################

@@ -150,3 +150,10 @@ endif()
 if (ANARI_DIR)
   include(cmake/thirdparty/SetupANARI.cmake)
 endif()
+
+################################
+# Setup airender (super-resolution upscaling)
+################################
+if (AIRENDER_DIR)
+  include(cmake/thirdparty/SetupAirender.cmake)
+endif()

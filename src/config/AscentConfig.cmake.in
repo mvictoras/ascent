@@ -112,6 +112,10 @@ if(NOT ASCENT_FOUND)
     set(ASCENT_ANARI_ENABLED @ANARI_FOUND@)
     set(ASCENT_ANARI_DIR "@ANARI_DIR@")
 
+    # advertise if airender super-resolution support is enabled
+    set(ASCENT_AIRENDER_ENABLED @AIRENDER_FOUND@)
+    set(ASCENT_AIRENDER_DIR "@AIRENDER_DIR@")
+
     # advertise if Kokkos support is enabled
     set(ASCENT_KOKKOS_ENABLED @KOKKOS_FOUND@)
     set(ASCENT_KOKKOS_DIR "@KOKKOS_DIR@")

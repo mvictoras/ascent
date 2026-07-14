@@ -53,6 +53,7 @@ build_mfem="${build_mfem:=true}"
 build_catalyst="${build_catalyst:=false}"
 build_zfp="${build_zfp:=true}"
 build_anari="${build_anari:=false}"
+build_airender="${build_airender:=false}"
 
 # ascent options
 build_ascent="${build_ascent:=true}"
@@ -1131,6 +1132,13 @@ if ${build_anari}; then
     # a future upstream ANARI-SDK build block would populate.
     ascent_anari_dir="${ANARI_DIR:-${anari_install_dir:-}}"
     echo 'set(ANARI_DIR ' ${ascent_anari_dir} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
+fi
+
+if ${build_airender}; then
+    # airender super-resolution upscaler. Externally supplied via AIRENDER_DIR
+    # (this script does not build airender itself).
+    ascent_airender_dir="${AIRENDER_DIR:-}"
+    echo 'set(AIRENDER_DIR ' ${ascent_airender_dir} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
 fi
 
 if [[ "$enable_cuda" == "ON" ]]; then

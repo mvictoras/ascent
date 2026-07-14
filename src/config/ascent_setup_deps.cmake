@@ -225,6 +225,34 @@ if(ASCENT_ANARI_ENABLED)
 endif()
 
 ###############################################################################
+# Setup airender (super-resolution upscaling)
+###############################################################################
+if(ASCENT_AIRENDER_ENABLED)
+    if(NOT AIRENDER_DIR)
+        set(AIRENDER_DIR ${ASCENT_AIRENDER_DIR})
+    endif()
+
+    set(_ascent_airender_config_dir "")
+    foreach(_candidate
+            "${AIRENDER_DIR}/lib/cmake/airender"
+            "${AIRENDER_DIR}/lib64/cmake/airender")
+        if(EXISTS "${_candidate}/airenderConfig.cmake")
+            set(_ascent_airender_config_dir "${_candidate}")
+            break()
+        endif()
+    endforeach()
+
+    if(NOT _ascent_airender_config_dir)
+        message(FATAL_ERROR
+            "Could not find airenderConfig.cmake under AIRENDER_DIR=${AIRENDER_DIR}")
+    endif()
+
+    find_dependency(airender REQUIRED
+                    NO_DEFAULT_PATH
+                    PATHS ${_ascent_airender_config_dir})
+endif()
+
+###############################################################################
 # Setup Viskores
 ###############################################################################
 if(NOT VISKORES_DIR)
