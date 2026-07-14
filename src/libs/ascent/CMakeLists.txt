@@ -51,6 +51,7 @@ set(ASCENT_FIDES_ENABLED  ${FIDES_FOUND})
 set(ASCENT_GENTEN_ENABLED ${GENTEN_FOUND})
 set(ASCENT_KOKKOS_ENABLED ${KOKKOS_FOUND})
 set(ASCENT_BABELFLOW_ENABLED ${BABELFLOW_FOUND})
+set(ASCENT_ANARI_ENABLED  ${ANARI_FOUND})
 
 if(OCCA_FOUND AND UMPIRE_FOUND)
     set(ASCENT_JIT_ENABLED TRUE)
@@ -101,6 +102,7 @@ mark_as_advanced(ASCENT_INSTALL_PREFIX
                  ASCENT_VISKORES_OPENMP_ENABLED
                  ASCENT_VISKORES_CUDA_ENABLED
                  ASCENT_VISKORES_KOKKOS_ENABLED
+                 ASCENT_ANARI_ENABLED
                  )
 
 # gen config header
@@ -322,6 +324,16 @@ if(GENTEN_FOUND)
     list(APPEND ascent_device_sources runtimes/flow_filters/ascent_runtime_genten_filters.cpp)
 endif()
 
+if(ANARI_FOUND)
+    # ANARI flow filters: shared AnariImpl in _common, one filter per remaining file.
+    list(APPEND ascent_headers runtimes/flow_filters/ascent_runtime_anari_filters.hpp)
+    list(APPEND ascent_headers runtimes/flow_filters/ascent_runtime_anari_common.hpp)
+    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_common.cpp)
+    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_triangles.cpp)
+    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_glyphs.cpp)
+    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_volume.cpp)
+endif()
+
 if(FORTRAN_FOUND)
     add_library(ascent_fortran OBJECT fortran/ascent_fortran.f90)
     list(APPEND ascent_sources $<TARGET_OBJECTS:ascent_fortran>)
@@ -428,6 +440,10 @@ endif()
 
 if(GENTEN_FOUND)
     list(APPEND ascent_thirdparty_libs genten)
+endif()
+
+if(ANARI_FOUND)
+    list(APPEND ascent_thirdparty_libs viskores::anari anari::anari)
 endif()
 
 ##########################################

@@ -57,6 +57,10 @@
    #include <ascent_runtime_genten_filters.hpp>
 #endif
 
+#if defined(ASCENT_ANARI_ENABLED)
+   #include <ascent_runtime_anari_filters.hpp>
+#endif
+
 
 using namespace flow;
 
@@ -172,6 +176,12 @@ register_builtin()
                                                              "dray_project_colors_2d");
     AscentRuntime::register_filter_type<DRayReflect>("transforms", "dray_reflect");
     AscentRuntime::register_filter_type<DRayVectorComponent>("transforms", "dray_vector_component");
+#endif
+
+#if defined(ASCENT_ANARI_ENABLED)
+    AscentRuntime::register_filter_type<AnariTriangles>("extracts", "anari_pseudocolor");
+    AscentRuntime::register_filter_type<AnariGlyphs>   ("extracts", "anari_glyphs");
+    AscentRuntime::register_filter_type<AnariVolume>   ("extracts", "anari_volume");
 #endif
 
 #if defined(ASCENT_MPI_ENABLED)
