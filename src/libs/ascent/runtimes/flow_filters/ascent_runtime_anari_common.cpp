@@ -28,6 +28,7 @@
 #include <mpi.h>
 #endif
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -440,8 +441,23 @@ AnariImpl::render(ANARIScene &scene)
     if (rank == 0)
     {
         const auto fb = anari_cpp::map<uint32_t>(device, frame, "channel.color");
+        const auto *rgba = reinterpret_cast<const unsigned char*>(fb.data);
+
         ascent::PNGEncoder encoder;
-        encoder.Encode(reinterpret_cast<const unsigned char*>(fb.data), fb.width, fb.height);
+        if (upscale.enabled())
+        {
+            const int up_w = int(std::lround(fb.width  * upscale.factor));
+            const int up_h = int(std::lround(fb.height * upscale.factor));
+            auto upscaler = make_upscaler(upscale);
+            std::vector<std::uint8_t> up_pixels;
+            upscaler->upscale(rgba, int(fb.width), int(fb.height),
+                              up_pixels, up_w, up_h);
+            encoder.Encode(up_pixels.data(), up_w, up_h);
+        }
+        else
+        {
+            encoder.Encode(rgba, fb.width, fb.height);
+        }
         encoder.Save(img_name + ".png");
         anari_cpp::unmap(device, frame, "channel.color");
     }
@@ -485,6 +501,20 @@ configure_from_params(AnariImpl &self,
     int image_height = 0;
     parse_image_dims(params, image_width, image_height);
     self.img_size = viskores::Vec2ui_32(image_width, image_height);
+
+    self.upscale = UpscaleConfig{};
+    if (params.has_path("upscale"))
+    {
+        const conduit::Node &up = params["upscale"];
+        if (up.has_path("algorithm"))
+        {
+            self.upscale.algorithm = parse_upscale_algorithm(up["algorithm"].as_string());
+        }
+        if (up.has_path("factor"))
+        {
+            self.upscale.factor = up["factor"].to_float64();
+        }
+    }
 }
 
 }}} // namespace ascent::runtime::filters

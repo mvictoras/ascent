@@ -33,6 +33,8 @@
 #include <anari/anari_cpp.hpp>
 #include <viskores/interop/anari/ANARIScene.h>
 
+#include "ascent_runtime_anari_upscale.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -103,6 +105,8 @@ struct AnariImpl
 
     viskores::Vec4f_32             background{0.0f, 0.0f, 0.0f, 0.0f};
     int                            pixel_samples{128};
+
+    UpscaleConfig                  upscale;
 };
 
 /// Extract YAML render parameters onto an AnariImpl. Handles field, camera
