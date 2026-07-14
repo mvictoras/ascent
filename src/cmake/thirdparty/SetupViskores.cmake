@@ -20,6 +20,26 @@ if(NOT Viskores_DIR)
     MESSAGE(FATAL_ERROR "Failed to find Viskores at VISKORES_DIR=${VISKORES_DIR}/lib/cmake/viskores-*")
 endif()
 
+# If Viskores was built with Viskores_ENABLE_ANARI=ON its ViskoresConfig.cmake
+# calls find_dependency(anari) transitively, which fails unless anari's config
+# dir is already on CMAKE_PREFIX_PATH. Resolve it from ANARI_DIR here so callers
+# only need to set ANARI_DIR once.
+if(ANARI_DIR)
+    foreach(_glob "${ANARI_DIR}/lib/cmake/anari-*" "${ANARI_DIR}/lib64/cmake/anari-*")
+        file(GLOB _matches "${_glob}")
+        foreach(_m ${_matches})
+            if(EXISTS "${_m}/anariConfig.cmake")
+                list(APPEND CMAKE_PREFIX_PATH "${_m}")
+                set(anari_DIR "${_m}")
+                break()
+            endif()
+        endforeach()
+        if(anari_DIR)
+            break()
+        endif()
+    endforeach()
+endif()
+
 find_package(Viskores REQUIRED QUIET)
 
 if(ENABLE_CUDA AND NOT Viskores_ENABLE_CUDA)

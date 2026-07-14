@@ -189,6 +189,42 @@ if(KOKKOS_DIR)
 endif()
 
 ###############################################################################
+# Setup ANARI
+#
+# Must run BEFORE find_dependency(Viskores) below: if Viskores was built with
+# Viskores_ENABLE_ANARI=ON its ViskoresConfig.cmake transitively calls
+# find_dependency(anari), which fails unless anari is already resolvable.
+###############################################################################
+if(ASCENT_ANARI_ENABLED)
+    if(NOT ANARI_DIR)
+        set(ANARI_DIR ${ASCENT_ANARI_DIR})
+    endif()
+
+    set(_ascent_anari_config_dir "")
+    foreach(_glob "${ANARI_DIR}/lib/cmake/anari-*" "${ANARI_DIR}/lib64/cmake/anari-*")
+        file(GLOB _matches "${_glob}")
+        foreach(_m ${_matches})
+            if(EXISTS "${_m}/anariConfig.cmake")
+                set(_ascent_anari_config_dir "${_m}")
+                break()
+            endif()
+        endforeach()
+        if(_ascent_anari_config_dir)
+            break()
+        endif()
+    endforeach()
+
+    if(NOT _ascent_anari_config_dir)
+        message(FATAL_ERROR
+            "Could not find anariConfig.cmake under ANARI_DIR=${ANARI_DIR}")
+    endif()
+
+    find_dependency(anari REQUIRED
+                    NO_DEFAULT_PATH
+                    PATHS ${_ascent_anari_config_dir})
+endif()
+
+###############################################################################
 # Setup Viskores
 ###############################################################################
 if(NOT VISKORES_DIR)
@@ -448,38 +484,6 @@ if(GENTEN_DIR)
     find_dependency(Genten REQUIRED
                     NO_DEFAULT_PATH
                     PATHS ${GENTEN_DIR}/lib64/cmake/)
-endif()
-
-###############################################################################
-# Setup ANARI
-###############################################################################
-if(ASCENT_ANARI_ENABLED)
-    if(NOT ANARI_DIR)
-        set(ANARI_DIR ${ASCENT_ANARI_DIR})
-    endif()
-
-    set(_ascent_anari_config_dir "")
-    foreach(_glob "${ANARI_DIR}/lib/cmake/anari-*" "${ANARI_DIR}/lib64/cmake/anari-*")
-        file(GLOB _matches "${_glob}")
-        foreach(_m ${_matches})
-            if(EXISTS "${_m}/anariConfig.cmake")
-                set(_ascent_anari_config_dir "${_m}")
-                break()
-            endif()
-        endforeach()
-        if(_ascent_anari_config_dir)
-            break()
-        endif()
-    endforeach()
-
-    if(NOT _ascent_anari_config_dir)
-        message(FATAL_ERROR
-            "Could not find anariConfig.cmake under ANARI_DIR=${ANARI_DIR}")
-    endif()
-
-    find_dependency(anari REQUIRED
-                    NO_DEFAULT_PATH
-                    PATHS ${_ascent_anari_config_dir})
 endif()
 
 ###############################################################################
