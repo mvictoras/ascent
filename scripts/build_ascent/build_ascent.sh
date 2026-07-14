@@ -1125,6 +1125,14 @@ if ${build_catalyst}; then
     echo 'set(CATALYST_DIR ' ${catalyst_cmake_dir} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
 fi
 
+if ${build_anari}; then
+    # Same resolution as the viskores block above (line ~730): prefer an
+    # externally-supplied ANARI_DIR, fall back to anari_install_dir which
+    # a future upstream ANARI-SDK build block would populate.
+    ascent_anari_dir="${ANARI_DIR:-${anari_install_dir:-}}"
+    echo 'set(ANARI_DIR ' ${ascent_anari_dir} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
+fi
+
 if [[ "$enable_cuda" == "ON" ]]; then
     echo 'set(ENABLE_CUDA ON CACHE BOOL "")' >> ${root_dir}/ascent-config.cmake
     echo 'set(CMAKE_CUDA_ARCHITECTURES ' ${CUDA_ARCH} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
