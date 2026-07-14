@@ -21,6 +21,8 @@
 
 #include <conduit.hpp>
 
+#include <flow_filter.hpp>
+
 #include <ascent_vtkh_collection.hpp>
 #include <vtkh/DataSet.hpp>
 #include <viskores/Bounds.h>
@@ -44,7 +46,7 @@ namespace ascent   { namespace runtime { namespace filters { namespace anari_det
 /// when $VTKM_ANARI_DEBUG_DEVICE is set.
 anari::Device load_device();
 
-/// Common conduit-param validation shared by all three anari_* filters.
+/// Common conduit-param validation shared by every anari_* filter.
 /// Checks field, image_prefix|camera/db_name, min/max/width/height/camera/*,
 /// color_table. Returns true if params are valid; populates info on failure.
 bool verify_params(const conduit::Node &params, conduit::Node &info);
@@ -53,8 +55,8 @@ bool verify_params(const conduit::Node &params, conduit::Node &info);
 /// extract the single expected topology, validate the field's component count.
 /// Returns nullptr if the input is invalid (caller should early-return).
 ///
-/// expected_components: 1 for triangles/volume (scalar), 3 for glyphs (vector).
-/// filter_kind: "Pseudocolor" | "Glyphs" | "Volume" (used in error messages).
+/// expected_components: required field arity (1 for scalar, 3 for vector).
+/// filter_kind: short label used in ASCENT_ERROR messages ("Volume", etc).
 vtkh::DataSet* extract_topology(::flow::Filter *filter,
                                 int expected_components,
                                 const char *filter_kind,

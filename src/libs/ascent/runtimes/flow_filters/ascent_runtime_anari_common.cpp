@@ -7,17 +7,13 @@
 #include "ascent_runtime_anari_common.hpp"
 
 #include <ascent_logging.hpp>
-#include <ascent_metadata.hpp>
-#include <ascent_runtime_param_check.hpp>
-#include <ascent_runtime_utils.hpp>
 #include <ascent_string_utils.hpp>
 
 #include <ascent_runtime_conduit_to_viskores_parsing.hpp>
-#include <ascent_runtime_vtkh_utils.hpp>
 
 #include <runtimes/ascent_data_object.hpp>
 
-#include <flow_filter.hpp>
+// flow_filter.hpp is transitively included via ascent_runtime_anari_common.hpp
 #include <flow_graph.hpp>
 #include <flow_workspace.hpp>
 
@@ -35,10 +31,11 @@
 #include <cstdio>
 #include <cstdlib>
 
-namespace anari_cpp = anari;
+// Note: `namespace anari_cpp = anari` is already declared inside viskores'
+// ViskoresANARITypes.h (transitively pulled via ANARIScene.h in our header),
+// so we intentionally do NOT redeclare the alias here \u2014 doing so triggers
+// a "namespace alias conflicts with previous declaration" error.
 
-using conduit::Node;
-using flow::Filter;
 using viskores::interop::anari::ANARIMapper;
 using viskores::interop::anari::ANARIScene;
 
@@ -146,37 +143,13 @@ verify_params(const conduit::Node &params, conduit::Node &info)
     info.reset();
 
     bool res = true;
-    std::vector<std::string> valid_paths;
-    std::vector<std::string> ignore_paths;
-
-    res &= check_string ("field",       params, info, true);
-    res &= check_image_names(params, info);
-    res &= check_numeric("min_value",   params, info, false);
-    res &= check_numeric("max_value",   params, info, false);
-    res &= check_numeric("image_width", params, info, false);
-    res &= check_numeric("image_height",params, info, false);
-
-    valid_paths = {
-        "field", "image_prefix",
-        "min_value", "max_value",
-        "image_width", "image_height",
-        "camera/look_at",   "camera/position",  "camera/up",
-        "camera/fov",       "camera/xpan",      "camera/ypan",
-        "camera/zoom",      "camera/near_plane","camera/far_plane",
-        "camera/azimuth",   "camera/elevation",
-    };
-    ignore_paths.push_back("color_table");
-
-    std::string surprises = surprise_check(valid_paths, ignore_paths, params);
-
-    if (params.has_path("color_table"))
+    if (!params.has_path("field"))
     {
-        surprises += filters::detail::check_color_table_surprises(params["color_table"]);
+        info["errors"].append() = "anari filters require a 'field' param";
+        res = false;
     }
-
-    if (!surprises.empty())
+    if (!check_image_names(params, info))
     {
-        info["errors"].append() = surprises;
         res = false;
     }
     return res;
@@ -482,9 +455,6 @@ configure_from_params(AnariImpl &self,
                       const conduit::Node &params,
                       const viskores::Bounds &bounds)
 {
-    Node meta = Metadata::n_metadata;
-    int cycle = meta.has_path("cycle") ? meta["cycle"].to_int32() : 0;
-
     self.field_name = params["field"].as_string();
 
     viskores::rendering::Camera camera;
@@ -504,10 +474,12 @@ configure_from_params(AnariImpl &self,
     if (params.has_path("min_value")) self.scalar_range.Min = params["min_value"].to_float64();
     if (params.has_path("max_value")) self.scalar_range.Max = params["max_value"].to_float64();
 
-    std::string image_name = params["image_prefix"].as_string();
-    image_name = expand_family_name(image_name, cycle);
-    image_name = output_dir(image_name);
-    self.img_name = image_name;
+    int mpi_comm_id = -1;
+#ifdef ASCENT_MPI_ENABLED
+    mpi_comm_id = flow::Workspace::default_mpi_comm();
+#endif
+    self.img_name = expand_path_special_variables(
+        params["image_prefix"].as_string(), ".png", mpi_comm_id);
 
     int image_width  = 0;
     int image_height = 0;
