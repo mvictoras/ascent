@@ -334,6 +334,7 @@ if(ANARI_FOUND)
     list(APPEND ascent_headers runtimes/flow_filters/ascent_runtime_anari_upscale.hpp)
     list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_common.cpp)
     list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_upscale.cpp)
+    list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_upscale_gpu.cpp)
     list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_surface.cpp)
     list(APPEND ascent_sources runtimes/flow_filters/ascent_runtime_anari_volume.cpp)
 endif()
@@ -462,6 +463,13 @@ if (ENABLE_SERIAL)
                     SOURCES     ${ascent_sources}
                     HEADERS     ${ascent_headers}
                     DEPENDS_ON  ${ascent_thirdparty_libs})
+
+    # GLAD linked PRIVATE (baked into the .so) so it does not appear in the
+    # exported interface; the GPU upscaler TU needs its headers too.
+    if(AIRENDER_FOUND)
+        target_include_directories(ascent PRIVATE ${ASCENT_GLAD_INCLUDE_DIR})
+        target_link_libraries(ascent PRIVATE ${ASCENT_GLAD_LIBRARIES})
+    endif()
 
     #  compile defs
     target_compile_definitions(ascent PRIVATE ASCENT_EXPORTS_FLAG)
@@ -663,6 +671,12 @@ if(MPI_FOUND)
                     HEADERS     ${ascent_headers} ${ascent_mpi_headers}
                     DEPENDS_ON  ${ascent_mpi_thirdparty_libs}
                     )
+
+    # GLAD linked PRIVATE (see the serial target above for rationale).
+    if(AIRENDER_FOUND)
+        target_include_directories(ascent_mpi PRIVATE ${ASCENT_GLAD_INCLUDE_DIR})
+        target_link_libraries(ascent_mpi PRIVATE ${ASCENT_GLAD_LIBRARIES})
+    endif()
 
     #  compile defs
     target_compile_definitions(ascent_mpi PRIVATE ASCENT_EXPORTS_FLAG)

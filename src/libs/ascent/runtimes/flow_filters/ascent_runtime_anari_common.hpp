@@ -107,6 +107,7 @@ struct AnariImpl
     int                            pixel_samples{128};
 
     UpscaleConfig                  upscale;
+    unsigned                       frame_index{0}; // drives DLSS Halton jitter
 };
 
 /// Extract YAML render parameters onto an AnariImpl. Handles field, camera

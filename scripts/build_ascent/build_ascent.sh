@@ -1136,9 +1136,12 @@ fi
 
 if ${build_airender}; then
     # airender super-resolution upscaler. Externally supplied via AIRENDER_DIR
-    # (this script does not build airender itself).
+    # (this script does not build airender itself). GLAD_DIR supplies the EGL+GL
+    # loader the GPU upscaler's headless context needs.
     ascent_airender_dir="${AIRENDER_DIR:-}"
     echo 'set(AIRENDER_DIR ' ${ascent_airender_dir} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
+    ascent_glad_dir="${GLAD_DIR:-}"
+    echo 'set(GLAD_DIR ' ${ascent_glad_dir} ' CACHE PATH "")' >> ${root_dir}/ascent-config.cmake
 fi
 
 if [[ "$enable_cuda" == "ON" ]]; then

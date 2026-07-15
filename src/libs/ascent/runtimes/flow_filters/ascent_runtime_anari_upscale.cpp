@@ -39,12 +39,16 @@ namespace
 class BilinearUpscaler final : public Upscaler
 {
 public:
-    void upscale(const std::uint8_t *src, int src_w, int src_h,
+    void upscale(const UpscaleInputs &in,
                  std::vector<std::uint8_t> &dst, int dst_w, int dst_h) override
     {
+        const std::uint8_t *src = in.color;
+        const int src_w = in.src_w;
+        const int src_h = in.src_h;
+
         dst.assign(std::size_t(dst_w) * dst_h * 4, 0);
 
-        if (src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
+        if (src == nullptr || src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
         {
             return;
         }
@@ -89,23 +93,9 @@ public:
 
 //-----------------------------------------------------------------------------
 std::unique_ptr<Upscaler>
-make_upscaler(const UpscaleConfig &cfg)
+make_cpu_bilinear_upscaler()
 {
-    switch (cfg.algorithm)
-    {
-        case UpscaleAlgorithm::Bilinear:
-            return std::make_unique<BilinearUpscaler>();
-
-        case UpscaleAlgorithm::FSR1:
-        case UpscaleAlgorithm::DLSS:
-            ASCENT_LOG_INFO("Anari upscale: FSR1/DLSS backend not yet available; "
-                            "falling back to CPU bilinear");
-            return std::make_unique<BilinearUpscaler>();
-
-        case UpscaleAlgorithm::None:
-        default:
-            return nullptr;
-    }
+    return std::make_unique<BilinearUpscaler>();
 }
 
 }}} // namespace ascent::runtime::filters

@@ -286,6 +286,27 @@ AnariImpl::set_lights()
 namespace
 {
 
+/// DLSS sub-pixel camera jitter: the radical-inverse Halton sequence (bases 2
+/// and 3), remapped from [0,1) to [-0.5,0.5) pixel offsets. index is the frame
+/// counter. DLSS accumulates detail across frames only if each frame is jittered
+/// by this low-discrepancy sequence.
+void halton_jitter(unsigned index, float &jx, float &jy)
+{
+    auto radical_inverse = [](unsigned i, unsigned base) {
+        float f = 1.0f, r = 0.0f;
+        while (i > 0)
+        {
+            f /= base;
+            r += f * (i % base);
+            i /= base;
+        }
+        return r;
+    };
+    // Halton is 1-based; index+1 avoids the degenerate (0,0) sample at frame 0.
+    jx = radical_inverse(index + 1, 2) - 0.5f;
+    jy = radical_inverse(index + 1, 3) - 0.5f;
+}
+
 /// Compute the scalar range for `field_name` on `dset` when the user did
 /// not supply min_value/max_value. `expected_components` is 1 for scalar
 /// fields (triangles/volume) or 3 for vector fields (glyphs).
@@ -426,6 +447,15 @@ AnariImpl::render(ANARIScene &scene)
 
     anari_cpp::setParameter(device, frame, "size",          img_size);
     anari_cpp::setParameter(device, frame, "channel.color", ANARI_UFIXED8_VEC4);
+    // DLSS needs per-pixel depth + screen-space motion vectors as additional
+    // temporal-upsampling inputs. Request them from Barney only for that path
+    // (bilinear/FSR1 are single-frame and use color alone).
+    const bool want_dlss = upscale.enabled() && upscale.algorithm == UpscaleAlgorithm::DLSS;
+    if (want_dlss)
+    {
+        anari_cpp::setParameter(device, frame, "channel.depth",  ANARI_FLOAT32);
+        anari_cpp::setParameter(device, frame, "channel.motion", ANARI_FLOAT32_VEC2);
+    }
     anari_cpp::setParameter(device, frame, "world",         world);
     anari_cpp::setParameter(device, frame, "camera",        camera);
     anari_cpp::setParameter(device, frame, "renderer",      renderer);
@@ -448,11 +478,32 @@ AnariImpl::render(ANARIScene &scene)
         {
             const int up_w = int(std::lround(fb.width  * upscale.factor));
             const int up_h = int(std::lround(fb.height * upscale.factor));
+
+            UpscaleInputs in;
+            in.color = rgba;
+            in.src_w = int(fb.width);
+            in.src_h = int(fb.height);
+
+            anari_cpp::MappedFrameData<float> depth_map{}, motion_map{};
+            if (want_dlss)
+            {
+                depth_map  = anari_cpp::map<float>(device, frame, "channel.depth");
+                motion_map = anari_cpp::map<float>(device, frame, "channel.motion");
+                in.depth   = depth_map.data;
+                in.motion  = motion_map.data;
+                halton_jitter(frame_index, in.jitter_x, in.jitter_y);
+            }
+
             auto upscaler = make_upscaler(upscale);
             std::vector<std::uint8_t> up_pixels;
-            upscaler->upscale(rgba, int(fb.width), int(fb.height),
-                              up_pixels, up_w, up_h);
+            upscaler->upscale(in, up_pixels, up_w, up_h);
             encoder.Encode(up_pixels.data(), up_w, up_h);
+
+            if (want_dlss)
+            {
+                anari_cpp::unmap(device, frame, "channel.depth");
+                anari_cpp::unmap(device, frame, "channel.motion");
+            }
         }
         else
         {
@@ -461,6 +512,7 @@ AnariImpl::render(ANARIScene &scene)
         encoder.Save(img_name + ".png");
         anari_cpp::unmap(device, frame, "channel.color");
     }
+    ++frame_index;
 
     anari_cpp::release(device, camera);
 }

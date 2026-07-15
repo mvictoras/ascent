@@ -55,24 +55,42 @@ struct UpscaleConfig
     }
 };
 
-/// Backend interface. Implementations take a source RGBA8 image and produce an
-/// enlarged RGBA8 image. depth/motion are optional GPU-backend inputs (nullptr
-/// for the CPU bilinear path).
+/// Per-frame inputs to an upscaler. color is required (RGBA8, row-major, 4
+/// bytes/pixel). depth (float32, 1/pixel) and motion (float32 vec2, 2/pixel)
+/// are only consumed by the DLSS backend; leave them null otherwise. jitter_x/y
+/// are the DLSS sub-pixel camera-jitter offsets in [-0.5,0.5] pixel units
+/// (Halton); ignored by bilinear/FSR1.
+struct UpscaleInputs
+{
+    const std::uint8_t *color{nullptr};
+    const float        *depth{nullptr};
+    const float        *motion{nullptr};
+    int                 src_w{0};
+    int                 src_h{0};
+    float               jitter_x{0.0f};
+    float               jitter_y{0.0f};
+};
+
+/// Backend interface: take UpscaleInputs and produce an enlarged RGBA8 image.
 class Upscaler
 {
 public:
     virtual ~Upscaler() = default;
 
-    /// Upscale src (src_w x src_h, RGBA8, row-major, 4 bytes/pixel) into dst
-    /// (dst_w x dst_h, RGBA8). dst is resized by the callee.
-    virtual void upscale(const std::uint8_t *src, int src_w, int src_h,
+    /// Upscale `in` into dst (dst_w x dst_h, RGBA8). dst is resized by the callee.
+    virtual void upscale(const UpscaleInputs &in,
                          std::vector<std::uint8_t> &dst, int dst_w, int dst_h) = 0;
 };
 
-/// Construct the upscaler for `cfg.algorithm`. Milestone 1 returns a CPU
-/// bilinear upscaler for Bilinear; FSR1/DLSS fall back to bilinear with a
-/// one-time warning until the airender backend lands.
+/// Construct the upscaler for the requested algorithm. Bilinear uses a pure-CPU
+/// resampler with no GPU dependencies. FSR1 and DLSS use the airender GPU
+/// backend (EGL/OpenGL plus Vulkan) in builds where ASCENT_AIRENDER_ENABLED is
+/// defined, and otherwise degrade to CPU bilinear with a single warning.
 std::unique_ptr<Upscaler> make_upscaler(const UpscaleConfig &cfg);
+
+/// Pure-CPU bilinear upscaler, used directly for Bilinear and as the fallback
+/// when a GPU backend is unavailable. Defined in ascent_runtime_anari_upscale.cpp.
+std::unique_ptr<Upscaler> make_cpu_bilinear_upscaler();
 
 }}} // namespace ascent::runtime::filters
 
