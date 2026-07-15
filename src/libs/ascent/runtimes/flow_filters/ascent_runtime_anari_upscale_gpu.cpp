@@ -79,13 +79,16 @@ public:
 
     ~EglContext()
     {
-        if (display_ != EGL_NO_DISPLAY)
-        {
-            eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-            if (context_ != EGL_NO_CONTEXT) eglDestroyContext(display_, context_);
-            if (surface_ != EGL_NO_SURFACE) eglDestroySurface(display_, surface_);
-            eglTerminate(display_);
-        }
+        // Intentionally leak the EGL display/context: it is only ever destroyed
+        // at process shutdown, so the OS reclaims it anyway, and we avoid poking
+        // the EGL teardown path from our side. NOTE: this does NOT by itself
+        // prevent the teardown abort seen with the NVIDIA driver -- that abort
+        // is a double-free inside the driver's own atexit thread-release path
+        // (eglReleaseThread -> libGLX_nvidia; confirmed via gdb: the backtrace
+        // has zero airender/Ascent frames) and fires independently of us, after
+        // all rendering is complete and outputs are flushed. It is a driver bug,
+        // not ours, and does not affect results. See run wrappers for how the
+        // benign post-completion abort is treated as success.
     }
 
 private:

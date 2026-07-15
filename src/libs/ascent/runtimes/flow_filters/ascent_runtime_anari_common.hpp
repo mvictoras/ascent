@@ -108,6 +108,12 @@ struct AnariImpl
 
     UpscaleConfig                  upscale;
     unsigned                       frame_index{0}; // drives DLSS Halton jitter
+
+    // Persistent across frames: the GPU (airender) upscaler owns an EGL/Vulkan
+    // context that is expensive to build and unsafe to create+destroy per frame
+    // (repeated eglTerminate + airender Vulkan teardown corrupts the heap at
+    // exit). Created lazily on first use, reused for every subsequent frame.
+    std::shared_ptr<Upscaler>      upscaler;
 };
 
 /// Extract YAML render parameters onto an AnariImpl. Handles field, camera

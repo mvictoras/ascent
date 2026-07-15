@@ -494,7 +494,10 @@ AnariImpl::render(ANARIScene &scene)
                 halton_jitter(frame_index, in.jitter_x, in.jitter_y);
             }
 
-            auto upscaler = make_upscaler(upscale);
+            if (!upscaler)
+            {
+                upscaler = make_upscaler(upscale);
+            }
             std::vector<std::uint8_t> up_pixels;
             upscaler->upscale(in, up_pixels, up_w, up_h);
             encoder.Encode(up_pixels.data(), up_w, up_h);
