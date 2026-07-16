@@ -484,6 +484,10 @@ AnariImpl::render(ANARIScene &scene)
             in.src_w = int(fb.width);
             in.src_h = int(fb.height);
 
+            unsigned shared_seq = 0;
+            upscaler = shared_upscaler(upscale, in.src_w, in.src_h,
+                                       up_w, up_h, shared_seq);
+
             anari_cpp::MappedFrameData<float> depth_map{}, motion_map{};
             if (want_dlss)
             {
@@ -491,13 +495,9 @@ AnariImpl::render(ANARIScene &scene)
                 motion_map = anari_cpp::map<float>(device, frame, "channel.motion");
                 in.depth   = depth_map.data;
                 in.motion  = motion_map.data;
-                halton_jitter(frame_index, in.jitter_x, in.jitter_y);
+                halton_jitter(shared_seq, in.jitter_x, in.jitter_y);
             }
 
-            if (!upscaler)
-            {
-                upscaler = make_upscaler(upscale);
-            }
             std::vector<std::uint8_t> up_pixels;
             upscaler->upscale(in, up_pixels, up_w, up_h);
             encoder.Encode(up_pixels.data(), up_w, up_h);
@@ -515,7 +515,6 @@ AnariImpl::render(ANARIScene &scene)
         encoder.Save(img_name + ".png");
         anari_cpp::unmap(device, frame, "channel.color");
     }
-    ++frame_index;
 
     anari_cpp::release(device, camera);
 }

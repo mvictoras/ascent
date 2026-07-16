@@ -107,12 +107,9 @@ struct AnariImpl
     int                            pixel_samples{128};
 
     UpscaleConfig                  upscale;
-    unsigned                       frame_index{0}; // drives DLSS Halton jitter
 
-    // Persistent across frames: the GPU (airender) upscaler owns an EGL/Vulkan
-    // context that is expensive to build and unsafe to create+destroy per frame
-    // (repeated eglTerminate + airender Vulkan teardown corrupts the heap at
-    // exit). Created lazily on first use, reused for every subsequent frame.
+    // Non-owning handle to the process-lifetime instance from shared_upscaler()
+    // (real ownership lives in that cache; see ascent_runtime_anari_upscale.hpp).
     std::shared_ptr<Upscaler>      upscaler;
 };
 

@@ -92,6 +92,17 @@ std::unique_ptr<Upscaler> make_upscaler(const UpscaleConfig &cfg);
 /// when a GPU backend is unavailable. Defined in ascent_runtime_anari_upscale.cpp.
 std::unique_ptr<Upscaler> make_cpu_bilinear_upscaler();
 
+/// Process-lifetime upscaler shared across filter recreation, keyed by
+/// (algorithm, src, dst). Ascent rebuilds the flow graph (and the anari_*
+/// filters) on every trigger, so a filter-owned upscaler would be destroyed and
+/// rebuilt each frame; for DLSS that is a second in-process CreateFeature while
+/// the first is still live and fails 0xbad00002. frame_seq is the shared
+/// monotonic counter so DLSS Halton jitter advances across triggers.
+std::shared_ptr<Upscaler> shared_upscaler(const UpscaleConfig &cfg,
+                                          int src_w, int src_h,
+                                          int dst_w, int dst_h,
+                                          unsigned &frame_seq);
+
 }}} // namespace ascent::runtime::filters
 
 #endif // ASCENT_RUNTIME_ANARI_UPSCALE_HPP

@@ -10,6 +10,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <mutex>
+#include <tuple>
 
 namespace ascent { namespace runtime { namespace filters {
 
@@ -96,6 +99,35 @@ std::unique_ptr<Upscaler>
 make_cpu_bilinear_upscaler()
 {
     return std::make_unique<BilinearUpscaler>();
+}
+
+//-----------------------------------------------------------------------------
+std::shared_ptr<Upscaler>
+shared_upscaler(const UpscaleConfig &cfg,
+                int src_w, int src_h,
+                int dst_w, int dst_h,
+                unsigned &frame_seq)
+{
+    using Key = std::tuple<int, int, int, int, int>;
+    struct Entry
+    {
+        std::shared_ptr<Upscaler> upscaler;
+        unsigned                  frame_seq{0};
+    };
+
+    static std::mutex          s_mutex;
+    static std::map<Key, Entry> s_cache;
+
+    const Key key{static_cast<int>(cfg.algorithm), src_w, src_h, dst_w, dst_h};
+
+    std::lock_guard<std::mutex> guard(s_mutex);
+    Entry &entry = s_cache[key];
+    if (!entry.upscaler)
+    {
+        entry.upscaler = make_upscaler(cfg);
+    }
+    frame_seq = entry.frame_seq++;
+    return entry.upscaler;
 }
 
 }}} // namespace ascent::runtime::filters
