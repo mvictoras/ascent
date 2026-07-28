@@ -77,6 +77,9 @@ public:
         return eglMakeCurrent(display_, surface_, surface_, context_) == EGL_TRUE;
     }
 
+    air::DeviceIdType device_id_type() const { return device_id_type_; }
+    char *device_id() { return has_device_id_ ? device_id_ : nullptr; }
+
     ~EglContext()
     {
         // Intentionally leak the EGL display/context: it is only ever destroyed
@@ -120,6 +123,29 @@ private:
                 chosen = devices[i];
                 break;
             }
+        }
+
+        const char *drm_path = eglQueryDeviceStringEXT(chosen, EGL_DRM_RENDER_NODE_FILE_EXT);
+        const char *egl_uuid = eglQueryDeviceStringEXT(chosen, EGL_DEVICE_UUID_EXT);
+        if (drm_path != nullptr)
+        {
+            device_id_type_ = air::DeviceIdType::DRM;
+            std::strncpy(device_id_, drm_path, sizeof(device_id_) - 1);
+            device_id_[sizeof(device_id_) - 1] = '\0';
+            has_device_id_ = true;
+            ASCENT_LOG_INFO("anari upscale(gpu): EGL device ID DRM=" << device_id_);
+        }
+        else if (egl_uuid != nullptr)
+        {
+            device_id_type_ = air::DeviceIdType::UUID;
+            std::memcpy(device_id_, egl_uuid, 16);
+            device_id_[16] = '\0';
+            has_device_id_ = true;
+            ASCENT_LOG_INFO("anari upscale(gpu): EGL device ID UUID (binary 16 bytes)");
+        }
+        else
+        {
+            ASCENT_LOG_INFO("anari upscale(gpu): could not detect EGL device via DRM or UUID");
         }
 
         display_ = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, chosen, nullptr);
@@ -188,6 +214,9 @@ private:
     EGLDisplay    display_{EGL_NO_DISPLAY};
     EGLSurface    surface_{EGL_NO_SURFACE};
     EGLContext    context_{EGL_NO_CONTEXT};
+    air::DeviceIdType device_id_type_{air::DeviceIdType::DRM};
+    char              device_id_[64]{};
+    bool              has_device_id_{false};
 };
 
 /// Upscaler backed by air::AiRenderer over the EglContext. Recreates the
@@ -269,7 +298,8 @@ private:
         ci.in_height  = static_cast<uint32_t>(src_h);
         ci.up_width   = static_cast<uint32_t>(dst_w);
         ci.up_height  = static_cast<uint32_t>(dst_h);
-        ci.device_id  = nullptr; // let air_vk pick the first discrete GPU
+        ci.device_id_type = egl_.device_id_type();
+        ci.device_id      = egl_.device_id();
         renderer_     = new air::AiRenderer(&ci);
 
         tex_color_ = renderer_->createGLTexture(air::TextureType::SRC_COLOR);
