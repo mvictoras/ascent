@@ -705,21 +705,18 @@ AnariImpl::render(ANARIScene &scene)
         motion.has_prev = true;
     }
 
-    // Sub-pixel jitter. Barney's ANARI camera forwards imageRegion's offset
-    // to its imageJitter param, which generateRays applies per pixel. The
-    // value is in PIXELS ([-0.5,0.5] per NVIDIA DLSS guide 3.7.3); Barney
-    // divides by the resolution itself, so do NOT pre-normalise here.
+    // Sub-pixel jitter in PIXELS ([-0.5,0.5] per NVIDIA DLSS guide 3.7.3);
+    // Barney's imageJitter divides by the resolution itself, so do NOT
+    // pre-normalise here.
     if (jitter_active)
     {
         // DLSS screen space is +Y down; Barney's dir_dv is +Y up.
         float ysign = 1.0f;
         if (const char *ys = getenv("ASCENT_ANARI_JITTER_YSIGN"))
             ysign = (ys[0] == '-') ? -1.0f : 1.0f;
-        const float jx = jitter_px_x;
-        const float jy = ysign * jitter_px_y;
-        const float region[4] = { jx, jy, 1.0f + jx, 1.0f + jy };
-        anari_cpp::setParameter(device, camera, "imageRegion",
-                                ANARI_FLOAT32_BOX2, region);
+        const float jitter[2] = { jitter_px_x, ysign * jitter_px_y };
+        anari_cpp::setParameter(device, camera, "imageJitter",
+                                ANARI_FLOAT32_VEC2, jitter);
     }
 
     anari_cpp::commitParameters(device, camera);
