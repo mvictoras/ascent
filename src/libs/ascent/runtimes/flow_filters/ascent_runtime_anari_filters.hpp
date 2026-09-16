@@ -72,6 +72,28 @@ private:
 };
 
 //-----------------------------------------------------------------------------
+/// YAML type: 'anari_merge'. Unions two DataObjects into one collection so a
+/// single 'anari' extract can render several pipelines together. Chained by
+/// AscentRuntime when an anari extract declares more than one distinct
+/// pipeline via 'plots'.
+///
+/// Params 'a_key'/'b_key' name the source pipeline of each input. Inputs are
+/// re-keyed to "<pipeline>::<topology>" so the anari filter can select a
+/// plot's own data: sibling pipelines share both topology and field names, so
+/// neither alone identifies a plot.
+class ASCENT_API AnariMerge : public ::flow::Filter
+{
+public:
+    AnariMerge();
+    virtual ~AnariMerge();
+
+    virtual void   declare_interface(conduit::Node &i);
+    virtual bool   verify_params(const conduit::Node &params,
+                                 conduit::Node &info);
+    virtual void   execute();
+};
+
+//-----------------------------------------------------------------------------
 /// YAML type: 'anari_volume'. Renders volumetric fields through ANARI.
 /// Requires a scalar (1-component) field defined over a 3D domain.
 class ASCENT_API AnariVolume : public ::flow::Filter

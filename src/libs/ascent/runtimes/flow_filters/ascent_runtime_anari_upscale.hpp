@@ -103,6 +103,60 @@ std::shared_ptr<Upscaler> shared_upscaler(const UpscaleConfig &cfg,
                                           int dst_w, int dst_h,
                                           unsigned &frame_seq);
 
+/// Process-lifetime accumulators for the ANARI render and super-resolution
+/// stages. These must outlive the filters, which Ascent destroys and rebuilds
+/// on every trigger, so they cannot be filter members.
+///
+/// render is measured on every rank. upscale_* are measured on rank 0 only,
+/// because the map/upscale/encode block in the ANARI filter is rank-0 guarded;
+/// a max-across-ranks reduction of those would be meaningless.
+/// upscale_infer covers just the backend call (the FSR1/DLSS inference);
+/// upscale_total additionally covers the colour upload and result readback.
+struct AnariStageTimings
+{
+    double render{0.0};
+    double upscale_infer{0.0};
+    double upscale_total{0.0};
+    long long render_calls{0};
+    long long upscale_calls{0};
+
+    // Time in pipeline transforms (slice, contour, clip, composite_vector,
+    // ...) as opposed to the anari extract. Accumulated by the flow workspace,
+    // which already measures every filter, so this needs no second timer.
+    double viz{0.0};
+    long long viz_calls{0};
+};
+
+AnariStageTimings &anari_stage_timings();
+
+/// Registers the flow filter-timing callback that fills AnariStageTimings::viz.
+/// Call once at runtime setup.
+void install_anari_filter_timing_sink();
+
+/// Previous frame's view-projection, needed by Barney's motion.viewProjection /
+/// motion.previousViewProjection pair to write channel.motion. Barney only
+/// emits motion vectors when BOTH are supplied (anari/Camera.cpp), so the
+/// previous matrix has to survive between triggers; like the timings above it
+/// cannot live in the filter, which Ascent rebuilds every frame.
+struct AnariCameraMotion
+{
+    float prev_view_proj[16]{};
+    bool  has_prev{false};
+
+    // Jitter must be applied to the camera on every rank before rendering,
+    // while shared_upscaler's counter only advances on rank 0 after it. This
+    // is the render-side counter; keeping it here keeps it per-extract.
+    unsigned jitter_seq{0};
+    float    jitter_x{0.0f};
+    float    jitter_y{0.0f};
+};
+
+/// Keyed per extract: a single actions file can declare several anari extracts
+/// (pb146 has three), each with its own camera. One shared store would let each
+/// extract overwrite the others' previous matrix within the same trigger,
+/// yielding prev == curr and therefore zero motion.
+AnariCameraMotion &anari_camera_motion(const std::string &key);
+
 }}} // namespace ascent::runtime::filters
 
 #endif // ASCENT_RUNTIME_ANARI_UPSCALE_HPP

@@ -91,6 +91,7 @@ private:
 
     void              ResetInfo();
     void              AddPublishedMeshInfo();
+    void              AddAnariStageTimings(conduit::Node &info);
 
     flow::Workspace   m_workspace;
     conduit::Node CreateDefaultFilters();

@@ -7,8 +7,10 @@
 #include "ascent_runtime_anari_upscale.hpp"
 
 #include <ascent_logging.hpp>
+#include <flow_workspace.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <mutex>
@@ -36,6 +38,18 @@ parse_upscale_algorithm(const std::string &name)
 namespace
 {
 
+/// Accumulates into the shared inference counter on scope exit, so the early
+/// returns in the resampler cannot skip it.
+struct CpuBilinearScope
+{
+    std::chrono::steady_clock::time_point start;
+    ~CpuBilinearScope()
+    {
+        anari_stage_timings().upscale_infer +=
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    }
+};
+
 /// CPU bilinear resampler over RGBA8 buffers. Uses half-pixel-centered sampling
 /// (the standard convention: sample at (x+0.5)*src/dst - 0.5) so the output is
 /// not biased toward the top-left corner and matches GPU GL_LINEAR blits.
@@ -45,6 +59,12 @@ public:
     void upscale(const UpscaleInputs &in,
                  std::vector<std::uint8_t> &dst, int dst_w, int dst_h) override
     {
+        // Counted as inference time like the GPU backends, so the metric stays
+        // comparable across algorithms: bilinear runs here on the CPU and never
+        // reaches the GPU backend where the other timers live.
+        const auto t_infer_start = std::chrono::steady_clock::now();
+        const CpuBilinearScope scope{t_infer_start};
+
         const std::uint8_t *src = in.color;
         const int src_w = in.src_w;
         const int src_h = in.src_h;
@@ -128,6 +148,49 @@ shared_upscaler(const UpscaleConfig &cfg,
     }
     frame_seq = entry.frame_seq++;
     return entry.upscaler;
+}
+
+AnariStageTimings &anari_stage_timings()
+{
+    static AnariStageTimings s_timings;
+    return s_timings;
+}
+
+namespace
+{
+// The anari extracts time themselves internally (render/upscale), so counting
+// them here as well would double-count. Everything else in the graph is a
+// pipeline transform, i.e. the visualization algorithms.
+bool is_render_filter(const std::string &type_name)
+{
+    return type_name == "anari"
+        || type_name == "anari_volume"
+        || type_name == "anari_merge";
+}
+
+void filter_timing_sink(const std::string &type_name, double seconds)
+{
+    if (is_render_filter(type_name))
+    {
+        return;
+    }
+    anari_stage_timings().viz += seconds;
+    anari_stage_timings().viz_calls++;
+}
+} // namespace
+
+void install_anari_filter_timing_sink()
+{
+    flow::set_filter_timing_sink(&filter_timing_sink);
+}
+
+AnariCameraMotion &anari_camera_motion(const std::string &key)
+{
+    static std::mutex s_mutex;
+    static std::map<std::string, AnariCameraMotion> s_motion;
+
+    std::lock_guard<std::mutex> guard(s_mutex);
+    return s_motion[key];
 }
 
 }}} // namespace ascent::runtime::filters

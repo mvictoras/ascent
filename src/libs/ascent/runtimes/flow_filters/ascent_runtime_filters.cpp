@@ -181,6 +181,9 @@ register_builtin()
 #if defined(ASCENT_ANARI_ENABLED)
     AscentRuntime::register_filter_type<AnariSurface>("extracts", "anari");
     AscentRuntime::register_filter_type<AnariVolume> ("extracts", "anari_volume");
+    // Not a user-facing extract: chained by AscentRuntime for multi-pipeline
+    // anari extracts, so it registers with flow directly.
+    flow::Workspace::register_filter_type<AnariMerge>();
 #endif
 
 #if defined(ASCENT_MPI_ENABLED)

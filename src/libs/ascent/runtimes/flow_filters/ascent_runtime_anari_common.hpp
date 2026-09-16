@@ -82,12 +82,31 @@ struct AnariImpl
     AnariImpl& operator=(const AnariImpl&) = delete;
 
     void set_tfn(viskores::interop::anari::ANARIMapper &mapper);
+    /// Builds the light list. With no `lights` YAML entry this is the legacy
+    /// single directional light, so existing actions files are unchanged.
     void set_lights();
+
+    /// Parsed `lights:` entries. Barney implements only directional, point
+    /// and hdri; other ANARI subtypes become inert UnknownObjects.
+    conduit::Node light_spec;
+    float         ambient_radiance{0.8f};
+    bool          denoise{true};
 
     void render_triangles(vtkh::DataSet &dset);
     void render_glyphs(vtkh::DataSet &dset);
     void render_volume(vtkh::DataSet &dset);
     void render(viskores::interop::anari::ANARIScene &scene);
+
+    /// Multi-plot path: add_plot_* accumulate mappers, render_scene() draws once.
+    /// Each add_plot_* reads field_name/scalar_range/tfn, so the caller must
+    /// reconfigure those between calls to give each plot its own color table.
+    void ensure_scene();
+    void add_plot_triangles(vtkh::DataSet &dset, const std::string &tag);
+    void add_plot_glyphs(vtkh::DataSet &dset, const std::string &tag);
+    void add_plot_volume(vtkh::DataSet &dset, const std::string &tag);
+    void render_scene();
+
+    std::unique_ptr<viskores::interop::anari::ANARIScene> scene;
 
     anari::Device                  device{};
     anari::Renderer                renderer{};
@@ -101,12 +120,17 @@ struct AnariImpl
     viskores::rendering::Camera    cam;
 
     std::string                    img_name{"anari"};
+    std::string                    img_prefix{"anari"};
     viskores::Vec2ui_32            img_size{1024, 768};
 
     viskores::Vec4f_32             background{0.0f, 0.0f, 0.0f, 0.0f};
     int                            pixel_samples{128};
 
     UpscaleConfig                  upscale;
+
+    // Scratch for the [0,1]-normalised copy of Barney's world-space depth.
+    // Member rather than local so it is not reallocated every frame.
+    std::vector<float>             depth_norm_;
 
     // Non-owning handle to the process-lifetime instance from shared_upscaler()
     // (real ownership lives in that cache; see ascent_runtime_anari_upscale.hpp).

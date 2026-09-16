@@ -37,6 +37,13 @@ namespace flow
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
+/// Called after every filter executes, with the filter's registered type name
+/// and its wall time. flow cannot depend on ascent, so consumers that want
+/// per-filter timings register a sink here instead.
+typedef void (*FilterTimingSink)(const std::string &filter_type, double seconds);
+
+FLOW_API void set_filter_timing_sink(FilterTimingSink sink);
+
 class FLOW_API Workspace
 {
 public:

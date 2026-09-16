@@ -20,6 +20,7 @@
 #include <ascent_config.h> // ASCENT_AIRENDER_ENABLED
 #include <ascent_logging.hpp>
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -272,8 +273,13 @@ public:
         air::UpscaleOptions opts{};
         opts.camera_jitter_x = in.jitter_x;
         opts.camera_jitter_y = in.jitter_y;
+        // The glFinish above and below make this a synchronized measurement of
+        // the FSR1/DLSS inference itself, with upload and readback excluded.
+        const auto t_infer_start = std::chrono::steady_clock::now();
         renderer_->upscaleImage(img_type, &fbo_, &opts);
         glFinish();
+        anari_stage_timings().upscale_infer +=
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_infer_start).count();
 
         readback(dst, dst_w, dst_h);
     }
@@ -344,11 +350,22 @@ private:
                         GL_DEPTH_COMPONENT, GL_FLOAT, in.depth);
 
         // motion is float32 vec2; convert to half for the RG16F motion texture.
+        // DLSS screen space has its origin top-left with +Y down (guide 3.6.1),
+        // while these buffers come through OpenGL, which is bottom-up. The
+        // dev-library watermark renders vertically flipped, confirming DLSS and
+        // our readback disagree on +Y. Colour/depth are orientation-agnostic
+        // here, but motion vectors encode a DIRECTION, so their Y must match.
+        const bool flip_mv_y = [] {
+            const char *e = getenv("ASCENT_ANARI_MV_FLIP_Y");
+            return e && e[0] == '1';
+        }();
         const std::size_t n = std::size_t(in.src_w) * in.src_h;
         motion_half_.resize(n * 2);
-        for (std::size_t i = 0; i < n * 2; ++i)
+        for (std::size_t i = 0; i < n; ++i)
         {
-            motion_half_[i] = f32_to_f16(in.motion[i]);
+            motion_half_[2 * i]     = f32_to_f16(in.motion[2 * i]);
+            motion_half_[2 * i + 1] = f32_to_f16(flip_mv_y ? -in.motion[2 * i + 1]
+                                                           :  in.motion[2 * i + 1]);
         }
         glBindTexture(GL_TEXTURE_2D, tex_motion_);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, in.src_w, in.src_h,

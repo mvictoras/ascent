@@ -47,6 +47,10 @@
 #include <ascent_data_object.hpp>
 #include <ascent_data_logger.hpp>
 
+#if defined(ASCENT_ANARI_ENABLED)
+#include <runtimes/flow_filters/ascent_runtime_anari_upscale.hpp>
+#endif
+
 #if defined(ASCENT_VISKORES_ENABLED)
 #include <viskores/cont/Error.h>
 #include <vtkh/vtkh.hpp>
@@ -350,6 +354,9 @@ AscentRuntime::Initialize(const conduit::Node &options)
     runtime::filters::register_builtin();
     // filters for expression evaluation
     runtime::expressions::register_builtin();
+#if defined(ASCENT_ANARI_ENABLED)
+    runtime::filters::install_anari_filter_timing_sink();
+#endif
 
     if(options.has_path("session_name"))
     {
@@ -402,6 +409,7 @@ AscentRuntime::Initialize(const conduit::Node &options)
 void
 AscentRuntime::Info(conduit::Node &out)
 {
+    AddAnariStageTimings(m_info);
     out.set(m_info);
 }
 
@@ -409,7 +417,29 @@ AscentRuntime::Info(conduit::Node &out)
 conduit::Node &
 AscentRuntime::Info()
 {
+    AddAnariStageTimings(m_info);
     return m_info;
+}
+
+//-----------------------------------------------------------------------------
+// The ANARI filter accumulators live behind Ascent's hidden-visibility wall, so
+// consumers cannot link them directly. Surface them through the public info
+// node instead. See AnariStageTimings for the per-field rank semantics.
+void
+AscentRuntime::AddAnariStageTimings(conduit::Node &info)
+{
+#if defined(ASCENT_ANARI_ENABLED)
+    const auto &st = ascent::runtime::filters::anari_stage_timings();
+    info["anari_stage_timings/render"]        = st.render;
+    info["anari_stage_timings/upscale_infer"] = st.upscale_infer;
+    info["anari_stage_timings/upscale_total"] = st.upscale_total;
+    info["anari_stage_timings/render_calls"]  = (conduit::int64)st.render_calls;
+    info["anari_stage_timings/upscale_calls"] = (conduit::int64)st.upscale_calls;
+    info["anari_stage_timings/viz"]           = st.viz;
+    info["anari_stage_timings/viz_calls"]     = (conduit::int64)st.viz_calls;
+#else
+    (void)info;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1146,6 +1176,53 @@ AscentRuntime::ConvertExtractToFlow(const conduit::Node &extract,
     extract_source = "source";
 
   }
+
+  // An anari extract with a 'plots' map draws several pipelines into one
+  // image. m_connections holds a single source per filter, so fold the
+  // distinct pipelines together through a chain of anari_merge filters and
+  // connect the extract to the end of that chain.
+  if(params.has_path("plots"))
+  {
+    std::vector<std::string> plot_sources;
+    const conduit::Node &plots = params["plots"];
+    for(conduit::index_t p = 0; p < plots.number_of_children(); ++p)
+    {
+      std::string src = plots.child(p).has_path("pipeline")
+                          ? plots.child(p)["pipeline"].as_string()
+                          : extract_source;
+      if(std::find(plot_sources.begin(), plot_sources.end(), src) == plot_sources.end())
+      {
+        plot_sources.push_back(src);
+      }
+    }
+
+    if(plot_sources.size() > 1)
+    {
+      std::string acc = plot_sources[0];
+      for(size_t p = 1; p < plot_sources.size(); ++p)
+      {
+        std::string merge_name = extract_name + "_merge_" + std::to_string(p);
+        conduit::Node merge_params;
+        // Only the first merge sees a raw pipeline on port a; later ones
+        // receive an already-keyed collection.
+        if(p == 1)
+        {
+          merge_params["a_key"] = plot_sources[0];
+        }
+        merge_params["b_key"] = plot_sources[p];
+        m_workspace.graph().add_filter("anari_merge", merge_name, merge_params);
+        m_workspace.graph().connect(acc,             merge_name, 0);
+        m_workspace.graph().connect(plot_sources[p], merge_name, 1);
+        acc = merge_name;
+      }
+      extract_source = acc;
+    }
+    else if(plot_sources.size() == 1)
+    {
+      extract_source = plot_sources[0];
+    }
+  }
+
   m_connections[extract_name] = extract_source;
 
 }

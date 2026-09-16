@@ -37,6 +37,12 @@ namespace flow
 // we will try this strategy.
 int Workspace::m_default_mpi_comm = -1;
 static int g_timing_exec_count = 0;
+static FilterTimingSink g_filter_timing_sink = NULL;
+
+void set_filter_timing_sink(FilterTimingSink sink)
+{
+    g_filter_timing_sink = sink;
+}
 
 //-----------------------------------------------------------------------------
 class Workspace::ExecutionPlan
@@ -321,6 +327,10 @@ Workspace::execute()
             Timer t_flt_exec;
             // execute
             f->execute();
+            if(g_filter_timing_sink != NULL)
+            {
+                g_filter_timing_sink(f->type_name(), t_flt_exec.elapsed());
+            }
             if(m_enable_timings)
             {
                 m_timing_info << g_timing_exec_count
