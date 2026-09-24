@@ -695,6 +695,10 @@ if [ ! -d ${viskores_src_dir} ]; then
   patch -p1 < ${script_dir}/2026_01_02_viskores_implent_pan_raytracing.patch
   patch -p1 < ${script_dir}/2026_04_10_viskores_1_1_0_volume_annotation_depth_hack.patch
   patch -p1 < ${script_dir}/2026_05_15_viskores_1_1_1_wireframer_fix.patch
+  if [ -n "${CUDA13_PATCH_DIR:-}" ] && [ -f "${CUDA13_PATCH_DIR}/viskores-cuda13-devprops.patch" ]; then
+    echo "**** Applying CUDA 13 patches to ${viskores_tarball}"
+    patch -p1 --forward < "${CUDA13_PATCH_DIR}/viskores-cuda13-devprops.patch"
+  fi
   cd ${root_dir}
 fi
 
@@ -840,12 +844,30 @@ fi
 if [ ! -d ${raja_src_dir} ]; then
   echo "**** Extracting ${raja_tarball}"
   tar ${tar_extra_args} -xzf ${raja_tarball} -C ${source_dir}
+
+  if [ -n "${CUDA13_PATCH_DIR:-}" ] && [ -f "${CUDA13_PATCH_DIR}/raja-cuda13-memutils.patch" ]; then
+    echo "**** Applying CUDA 13 patches to ${raja_tarball}"
+    patch -p1 -d ${raja_src_dir} --forward < "${CUDA13_PATCH_DIR}/raja-cuda13-memutils.patch"
+  fi
 fi
 
 raja_extra_cmake_args=""
 if [[ "$enable_cuda" == "ON" ]]; then
   raja_extra_cmake_args="-DENABLE_CUDA=ON"
   raja_extra_cmake_args="${raja_extra_cmake_args} -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}"
+  # RAJA turns on RAJA_ENABLE_EXTERNAL_CUB for CUDA >= 11, and its FindCUB
+  # searches for "cub/cub.cuh" under ${CUB_DIR}, so CUB_DIR must be the parent
+  # of cub/. CUDA 13 moved CUB/Thrust into the CCCL tree (include/cccl/cub),
+  # while CUDA <= 12 kept them at include/cub. Pick whichever exists, else the
+  # configure aborts with "External CUB not found, CUB_DIR=.".
+  if [[ -n "${CUDA_HOME:-}" ]]; then
+    for _cub_parent in "${CUDA_HOME}/include/cccl" "${CUDA_HOME}/include"; do
+      if [[ -f "${_cub_parent}/cub/cub.cuh" ]]; then
+        raja_extra_cmake_args="${raja_extra_cmake_args} -DCUB_DIR=${_cub_parent}"
+        break
+      fi
+    done
+  fi
 fi
 
 if [[ "$enable_hip" == "ON" ]]; then
@@ -921,6 +943,12 @@ fi
 if [ ! -d ${umpire_src_dir} ]; then
   echo "**** Extracting ${umpire_tarball}"
   tar ${tar_extra_args} -xzf ${umpire_tarball} -C ${source_dir}
+
+  if [ -n "${CUDA13_PATCH_DIR:-}" ] && [ -f "${CUDA13_PATCH_DIR}/umpire-cuda13-advise.patch" ]; then
+    echo "**** Applying CUDA 13 patches to ${umpire_tarball}"
+    patch -p1 -d ${umpire_src_dir} --forward < "${CUDA13_PATCH_DIR}/umpire-cuda13-advise.patch"
+    patch -p1 -d ${umpire_src_dir} --forward < "${CUDA13_PATCH_DIR}/umpire-cuda13-prefetch.patch"
+  fi
 fi
 
 echo "**** Configuring Umpire ${umpire_version}"
